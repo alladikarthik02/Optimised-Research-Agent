@@ -1,0 +1,15 @@
+# Virtual-env & Python cruft
+.venv/
+__pycache__/
+*.py[cod]
+
+# IDE settings
+.vscode/
+.idea/
+
+# Secrets & configs
+.env
+.env.*
+
+# OS files
+.DS_Store
