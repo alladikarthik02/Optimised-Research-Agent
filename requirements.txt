@@ -1,0 +1,7 @@
+fastapi==0.111.0
+langchain>=0.2.0
+chromadb
+openai
+duckduckgo-search
+python-dotenv
+uvicorn
