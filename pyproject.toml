@@ -11,13 +11,14 @@ packages = [{ include = "llamascholar" }]
 python                 = "^3.11"
 
 # core stack
-langchain-community    = "^0.3.26"
 duckduckgo-search      = "^8.0.4"
 langchain-cloudflare   = "^0.1.8"
 langchain-openai       = "^0.3.26"
 arxiv                  = "^2.2.0"
 
 # —— Development / test extras ————————————————————————————
+python-dotenv = "^1.1.1"
+langchain = "^0.3.26"
 [tool.poetry.group.dev.dependencies]
 pytest     = "^8.2"
 black      = "^24.4"
