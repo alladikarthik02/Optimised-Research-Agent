@@ -1,44 +1,53 @@
 #!/usr/bin/env python
 """
-graph_runner.py — minimal, compatible with LangGraph ≥0.3
+llamascholar/graph_runner.py
+────────────────────────────────────────────────────────────
+• Zero-Shot ReAct agent powered by Cloudflare Workers-AI
+  (@cf/meta/llama-3-8b-instruct)
+• Tool belt: duckduckgo_search, arxiv_search, vector_qa (Chroma RAG)
+• Chat history stored in Redis if REDIS_URL is available; otherwise
+  in-process memory.
+• Usable both as a CLI script and as an import for FastAPI.
 """
+
 from __future__ import annotations
 
 import os
 import sys
 from typing import Any
 
-from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.prebuilt import create_react_agent
 from langchain_cloudflare import ChatCloudflareWorkersAI
 
 from llamascholar.tool_registry import get_tools
 from llamascholar.rag_tool import build_rag_tool
+from llamascholar.memory import get_memory           # <- returns RedisSaver() or InMemorySaver()
 
-# ───────── 1. LLM ───────── #
+# ───────────────────────── 1.  LLM ───────────────────────── #
 llm = ChatCloudflareWorkersAI(
-    model="@cf/meta/llama-3-8b-instruct",
+    model="@cf/meta/llama-3-8b-instruct",          # full alias incl. @cf/
     account_id=os.environ["CF_ACCOUNT_ID"],
     api_token=os.environ["CF_API_TOKEN"],
     temperature=0.0,
+    streaming=True,
 )
 
-# ───────── 2. Tools ─────── #
+# ───────────────────────── 2.  Tools ─────────────────────── #
 TOOLS = get_tools() + [build_rag_tool()]
 
-# ───────── 3. Graph ─────── #
+# ───────────────────────── 3.  Agent graph ───────────────── #
 agent_graph = create_react_agent(
     model=llm,
     tools=TOOLS,
-    checkpointer=InMemorySaver(),     # chat history per thread
+    checkpointer=get_memory(),                     # Redis or fallback
     name="llamascholar-react",
-)   # ← no prompt argument
+)  # default prompt comes from LangGraph
 
-# ───────── 4. CLI ───────── #
+# ───────────────────────── 4.  CLI helper ────────────────── #
 def ask(question: str, thread_id: str = "cli") -> None:
     """
-    Send `question`, print the assistant’s final reply.
-    A static system message keeps LlamaScholar’s voice.
+    Send *question* to the agent and print the final assistant reply.
+    `thread_id` lets you keep multi-turn context.
     """
     result: dict[str, Any] = agent_graph.invoke(
         {
@@ -58,6 +67,7 @@ def ask(question: str, thread_id: str = "cli") -> None:
     print("\n🔍  Answer:\n", result["messages"][-1].content)
 
 
+# ───────────────────────── 5.  Entrypoint ────────────────── #
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         sys.exit("Usage: python -m llamascholar.graph_runner \"<your question>\"")

@@ -1,12 +1,25 @@
 """
-BufferMemory wrapper.  For now it's in-process; in Day 4 we'll switch to
-RedisJSON by replacing TWO lines here.
+Redis-backed checkpoint saver (falls back to in-memory if Redis absent).
 """
 
-from langchain.memory import ConversationBufferMemory
+from functools import lru_cache
+import os
 
-_memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+try:
+    # LangGraph ≥ 0.3.3
+    from langgraph.checkpoint.redis import RedisSaver
+except ImportError:  # old package or missing redis extras
+    RedisSaver = None
 
-
+@lru_cache
 def get_memory():
-    return _memory
+    if RedisSaver is None or "REDIS_URL" not in os.environ:
+        # graceful fallback
+        from langgraph.checkpoint.memory import InMemorySaver
+
+        return InMemorySaver()
+    return RedisSaver(
+        redis_url=os.environ["REDIS_URL"],
+        namespace="llamascholar-chat",
+        ttl=60 * 60 * 24,  # 24 h
+    )
