@@ -1,55 +1,72 @@
-# api.py (only the changed parts shown)
+"""
+FastAPI wrapper that streams answers over Server-Sent Events (SSE).
+
+POST /ask  →  stream
+GET  /health → {"status":"ok"}
+"""
+
+from __future__ import annotations
 from typing import AsyncGenerator
-from pydantic import BaseModel
+
+import os
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
+from fastapi.staticfiles import StaticFiles
 
-# 1️⃣  Body schema so Swagger knows what to render
+from llamascholar.graph_runner import agent_graph
+from llamascholar.memory import get_memory  # ensures Redis is initialised
+
+# ───── FastAPI init ─────────────────────────────────────────── #
+app = FastAPI(title="LlamaScholar")
+
+# serve demo page if it exists
+if os.path.exists("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+# ------- body model so Swagger shows a textbox ---------------- #
 class AskPayload(BaseModel):
     query: str
     thread_id: str | None = None
-    stream: bool = True  # future-proof flag
-
-app = FastAPI(title="LlamaScholar API")
+    stream: bool = True
 
 @app.post("/ask", response_class=EventSourceResponse, summary="Ask (SSE)")
 async def ask(payload: AskPayload):
-    """
-    Stream the answer token-by-token using Server-Sent Events.
-    Set `stream=false` to get a blocking JSON instead.
-    """
     if not payload.query.strip():
-        raise HTTPException(status_code=422, detail="query must be non-empty")
+        raise HTTPException(422, "query must be non-empty")
 
+    # blocking mode for Swagger or simple clients
+    if not payload.stream:
+        answer = agent_graph.invoke(
+            {
+                "messages": [
+                    {"role": "system", "content": "You are LlamaScholar."},
+                    {"role": "user", "content": payload.query},
+                ]
+            },
+            {"configurable": {"thread_id": payload.thread_id or "cli"}},
+        )["messages"][-1].content
+        return JSONResponse({"answer": answer})
+
+    # streaming mode (SSE)
     async def event_stream() -> AsyncGenerator[dict, None]:
-        thread_id = payload.thread_id or "web"
         async for chunk in agent_graph.astream_events(
             {
                 "messages": [
-                    { "role": "system",
-                      "content": "You are LlamaScholar, a concise research assistant." },
-                    { "role": "user", "content": payload.query }
+                    {"role": "system", "content": "You are LlamaScholar."},
+                    {"role": "user", "content": payload.query},
                 ]
             },
-            { "configurable": { "thread_id": thread_id } },
+            {"configurable": {"thread_id": payload.thread_id or "web"}},
         ):
             if chunk.get("event") == "token":
-                yield { "event": "token", "data": chunk["data"] }
-        yield { "event": "done", "data": "[DONE]" }
-
-    # Allow a blocking JSON mode if someone wants it
-    if not payload.stream:
-        final = await agent_graph.invoke(
-            {
-                "messages": [
-                    { "role": "system",
-                      "content": "You are LlamaScholar, a concise research assistant." },
-                    { "role": "user", "content": payload.query }
-                ]
-            },
-            { "configurable": { "thread_id": payload.thread_id or "cli" } },
-        )
-        return JSONResponse({ "answer": final["messages"][-1].content })
+                yield {"event": "token", "data": chunk["data"]}
+        yield {"event": "done", "data": "[DONE]"}
 
     return EventSourceResponse(event_stream())
+s

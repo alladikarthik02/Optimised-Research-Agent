@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head><title>LlamaScholar Demo</title></head>
+<body>
+  <h3>LlamaScholar</h3>
+  <input id="q" size="60" placeholder="Ask me anything…">
+  <button onclick="ask()">Send</button>
+  <pre id="out"></pre>
+
+  <script>
+    function ask() {
+      document.getElementById("out").textContent = "";
+      const es = new EventSource("/ask?stream=true", {
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+        body: JSON.stringify({ query: document.getElementById("q").value })
+      });
+      es.addEventListener("token", e => {
+        document.getElementById("out").textContent += e.data;
+      });
+      es.addEventListener("done", () => es.close());
+    }
+  </script>
+</body>
+</html>
