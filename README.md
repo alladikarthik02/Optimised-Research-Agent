@@ -29,8 +29,8 @@ cp .env.example .env          # fill CF_ACCOUNT_ID / CF_API_TOKEN / REDIS_URL
 docker compose up --build     # brings up API + Redis-Stack
 # ➜ http://localhost:8000/docs  – test POST /ask
 ```
-###🛠️ Fine-tune the model (optional)
-
+#🛠️ Fine-tune the model (optional)
+```bash
 # 1️⃣  TSV → JSONL  (instruction \t answer)
 poetry run python scripts/prepare_dataset.py data/pairs.tsv data/train.jsonl
 
@@ -45,6 +45,8 @@ huggingface-cli upload merged-out/* \
 Then set in .env:
 
 LLM_MODEL=@hf/yourname/llamascholar-8b-finetuned
+```
+
 🔌 Environment variables (.env)
 
 Key	Example	Required
