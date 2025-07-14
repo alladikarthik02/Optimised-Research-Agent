@@ -1,9 +1,30 @@
-# LlamaScholar
+# LlamaScholar 🦙📚
 
-**15-day sprint** to ship a public research-assistant agent powered by Cloudflare Workers AI (Llama-3 8B), DuckDuckGo & arXiv search, and Chroma-backed RAG, wrapped in a LangGraph pipeline and a tiny FastAPI service.
+**LlamaScholar** is an end-to-end research assistant that couples a fine-tuned **Llama-3 8B** model with a modern retrieval pipeline (DuckDuckGo, arXiv, and PDF-to-Chroma RAG) and serves real-time answers via **FastAPI** + SSE.  
+It runs anywhere Docker runs and persists chat history in **Redis Stack**.
 
-| Week | Focus | Milestone |
-|------|-------|-----------|
-| 1 (23–27 Jun) | Repo skeleton · zero-shot React agent · FastAPI wrapper · Render deploy | — |
-| 2 (30 Jun–4 Jul) | Chroma RAG · memory · LangGraph refactor · W&B dashboards | v0.1.0 |
-| 3 (7–11 Jul) | ZeroGPU fallback · Redis cache · simple web UI · Loom demo | v1.0.0 |
+---
+
+## ✨ Features
+
+| Layer | What it gives you |
+|-------|-------------------|
+| **LLM** | Cloudflare Workers-AI wrapper by default, or your own HF model (`@hf/…`). |
+| **Fine-tuning** | LoRA/QLoRA scripts (`scripts/finetune_lora.py`, `merge_lora.py`) for instruction tuning on custom datasets. |
+| **RAG** | `ingest_pdf.py` → splits PDFs, stores chunks in **Chroma**; queried via `vector_qa` LangChain tool. |
+| **Agent** | Zero-Shot-ReAct built with **LangGraph**; tools: DuckDuckGo, arXiv, vector QA. |
+| **Memory** | **RedisSaver** (Redis Stack) checkpoint – chat survives restarts & scales horizontally. |
+| **API** | `/ask` streams tokens (Server-Sent Events), `/health` for probes, Swagger docs `/docs`. |
+| **Web UI** | `static/index.html` – 1-page client that streams answers live. |
+| **Dev & Deploy** | Dockerfile, `docker-compose.yml`, `.env.example`; CI stub in `.github/workflows/`. |
+
+---
+
+## 🚀 Quick start (local)
+
+```bash
+git clone https://github.com/<you>/llamascholar.git
+cd llamascholar
+cp .env.example .env          # fill CF_ACCOUNT_ID / CF_API_TOKEN / REDIS_URL
+docker compose up --build     # brings up API + Redis-Stack
+# ➜ http://localhost:8000/docs  – test POST /ask
